@@ -1,16 +1,21 @@
-from aiosqlite import Row
-from aiosqlite import connect
+from asyncio import CancelledError
+from contextlib import suppress
+from shutil import move
 
-from src.custom import PROJECT_ROOT
+from aiosqlite import Row, connect
+
+from ..custom import VOLUME
 
 __all__ = ["Database"]
 
 
 class Database:
-    __FILE = "TikTokDownloader.db"
+    __FILE = "DouK-Downloader.db"
 
-    def __init__(self, ):
-        self.file = PROJECT_ROOT.joinpath(self.__FILE)
+    def __init__(
+        self,
+    ):
+        self.file = VOLUME.joinpath(self.__FILE)
         self.database = None
         self.cursor = None
 
@@ -20,6 +25,7 @@ class Database:
         self.cursor = await self.database.cursor()
         await self.__create_table()
         await self.__write_default_config()
+        await self.__write_default_option()
         await self.database.commit()
 
     async def __create_table(self):
@@ -27,35 +33,70 @@ class Database:
             """CREATE TABLE IF NOT EXISTS config_data (
             NAME TEXT PRIMARY KEY,
             VALUE INTEGER NOT NULL CHECK(VALUE IN (0, 1))
-            );""")
-        await self.database.execute("CREATE TABLE IF NOT EXISTS download_data (ID TEXT PRIMARY KEY);")
+            );"""
+        )
+        await self.database.execute(
+            "CREATE TABLE IF NOT EXISTS download_data (ID TEXT PRIMARY KEY);"
+        )
         await self.database.execute("""CREATE TABLE IF NOT EXISTS mapping_data (
         ID TEXT PRIMARY KEY,
         NAME TEXT NOT NULL,
         MARK TEXT NOT NULL
         );""")
+        await self.database.execute("""CREATE TABLE IF NOT EXISTS option_data (
+        NAME TEXT PRIMARY KEY,
+        VALUE TEXT NOT NULL
+        );""")
 
     async def __write_default_config(self):
         await self.database.execute("""INSERT OR IGNORE INTO config_data (NAME, VALUE)
-                            VALUES ('Update', 1),
-                            ('Record', 1),
+                            VALUES ('Record', 1),
                             ('Logger', 0),
                             ('Disclaimer', 0);""")
+
+    async def __write_default_option(self):
+        await self.database.execute("""INSERT OR IGNORE INTO option_data (NAME, VALUE)
+                            VALUES ('Language', 'zh_CN');""")
 
     async def read_config_data(self):
         await self.cursor.execute("SELECT * FROM config_data")
         return await self.cursor.fetchall()
 
-    async def update_config_data(self, name: str, value: int, ):
-        await self.database.execute("REPLACE INTO config_data (NAME, VALUE) VALUES (?,?)", (name, value))
+    async def read_option_data(self):
+        await self.cursor.execute("SELECT * FROM option_data")
+        return await self.cursor.fetchall()
+
+    async def update_config_data(
+        self,
+        name: str,
+        value: int,
+    ):
+        await self.database.execute(
+            "REPLACE INTO config_data (NAME, VALUE) VALUES (?,?)", (name, value)
+        )
+        await self.database.commit()
+
+    async def update_option_data(
+        self,
+        name: str,
+        value: str,
+    ):
+        await self.database.execute(
+            "REPLACE INTO option_data (NAME, VALUE) VALUES (?,?)", (name, value)
+        )
         await self.database.commit()
 
     async def update_mapping_data(self, id_: str, name: str, mark: str):
-        await self.database.execute("REPLACE INTO mapping_data (ID, NAME, MARK) VALUES (?,?,?)", (id_, name, mark))
+        await self.database.execute(
+            "REPLACE INTO mapping_data (ID, NAME, MARK) VALUES (?,?,?)",
+            (id_, name, mark),
+        )
         await self.database.commit()
 
     async def read_mapping_data(self, id_: str):
-        await self.cursor.execute("SELECT NAME, MARK FROM mapping_data WHERE ID=?", (id_,))
+        await self.cursor.execute(
+            "SELECT NAME, MARK FROM mapping_data WHERE ID=?", (id_,)
+        )
         return await self.cursor.fetchone()
 
     async def has_download_data(self, id_: str) -> bool:
@@ -64,7 +105,8 @@ class Database:
 
     async def write_download_data(self, id_: str):
         await self.database.execute(
-            "INSERT OR IGNORE INTO download_data (ID) VALUES (?);", (id_,))
+            "INSERT OR IGNORE INTO download_data (ID) VALUES (?);", (id_,)
+        )
         await self.database.commit()
 
     async def delete_download_data(self, ids: list | tuple | str):
@@ -83,12 +125,20 @@ class Database:
         await self.database.commit()
 
     async def __aenter__(self):
+        self.compatible()
         await self.__connect_database()
         return self
 
     async def close(self):
-        await self.cursor.close()
+        with suppress(CancelledError):
+            await self.cursor.close()
         await self.database.close()
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         await self.close()
+
+    def compatible(self):
+        if (
+            old := VOLUME.parent.joinpath(self.__FILE)
+        ).exists() and not self.file.exists():
+            move(old, self.file)

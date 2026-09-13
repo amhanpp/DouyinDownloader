@@ -1,0 +1,40 @@
+name: "自动管理过时的问题和PR"
+on:
+  schedule:
+    - cron: "0 0 * * 6"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v11
+        with:
+          stale-issue-message: |
+            ⚠️ 此 Issue 已超过一定时间未活动，如果没有进一步更新，将在 14 天后关闭。
+            ⚠️ This issue has been inactive for a certain period of time. If there are no further updates, it will be closed in 14 days.
+          close-issue-message: |
+            🔒 由于长时间未响应，此 Issue 已被自动关闭。如有需要，请重新打开或提交新 issue。
+            🔒 Due to prolonged inactivity, this issue has been automatically closed. If needed, please reopen it or submit a new issue.
+          stale-pr-message: |
+            ⚠️ 此 PR 已超过一定时间未更新，请更新，否则将在 14 天后关闭。
+            ⚠️ This PR has not been updated for a certain period of time. Please update it, otherwise it will be closed in 14 days.
+          close-pr-message: |
+            🔒 此 PR 已因无更新而自动关闭。如仍需合并，请重新打开或提交新 PR。
+            🔒 This PR has been automatically closed due to inactivity. If you still wish to merge it, please reopen it or submit a new PR.
+
+          days-before-stale: 28
+          days-before-close: 14
+
+          ascending: true
+
+          stale-issue-label: "未跟进问题(Stale)"
+          close-issue-label: "自动关闭(Close)"
+          stale-pr-label: "未跟进问题(Stale)"
+          close-pr-label: "自动关闭(Close)"
+          exempt-issue-labels: "功能异常(bug),文档补充(docs),功能优化(enhancement),适合新手(good first issue)"
+          exempt-pr-labels: "功能异常(bug),文档补充(docs),功能优化(enhancement),适合新手(good first issue)"

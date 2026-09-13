@@ -1,70 +1,94 @@
-from asyncio import run
-from typing import TYPE_CHECKING
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 from src.interface.template import APITikTok
-from src.testers import Params
+from src.translation import _
 
 if TYPE_CHECKING:
     from src.config import Parameter
+    from src.testers import Params
 
 
 class InfoTikTok(APITikTok):
     def __init__(
-            self,
-            params: Union["Parameter", Params],
-            cookie: str | dict = None,
-            proxy: str = None,
-            unique_id: Union[str] = "",
-            sec_user_id: Union[str] = "",
-            *args,
-            **kwargs,
+        self,
+        params: Union["Parameter", "Params"],
+        cookie: str = "",
+        proxy: str | None = None,
+        unique_id: Union[str] = "",
+        sec_user_id: Union[str] = "",
+        *args,
+        **kwargs,
     ):
-        super().__init__(params, cookie, proxy, *args, **kwargs, )
+        super().__init__(params, cookie, proxy, *args, **kwargs)
         self.api = f"{self.domain}api/user/detail/"
         self.unique_id = unique_id
         self.sec_user_id = sec_user_id
-        self.text = "账号简略信息"
+        self.text = _("账号简略")
 
-    async def run(self, first=True, *args, **kwargs, ) -> dict | list[dict]:
+    async def run(
+        self,
+        # first=True,
+        *args,
+        **kwargs,
+    ) -> dict | list[dict]:
         self.set_referer()
         await self.run_single()
-        return self.response
+        return self.response[0] if self.response else {}
 
-    async def run_single(self, *args, **kwargs, ):
-        await super().run_single("", )
+    async def run_single(
+        self,
+        *args,
+        **kwargs,
+    ):
+        await super().run_single(
+            "",
+        )
 
-    def check_response(self, data_dict: dict, *args, **kwargs, ):
+    def check_response(
+        self,
+        data_dict: dict,
+        *args,
+        **kwargs,
+    ):
         if d := data_dict.get("userInfo"):
             self.append_response(d)
         else:
-            self.log.warning(f"获取{self.text}失败")
+            self.log.warning(_("获取{text}失败").format(text=self.text))
 
     def append_response(
-            self,
-            data: dict,
-            *args,
-            **kwargs,
+        self,
+        data: dict,
+        *args,
+        **kwargs,
     ) -> None:
         self.response.append(data)
 
-    def generate_params(self, ) -> dict:
+    def generate_params(
+        self,
+    ) -> dict:
         return self.params | {
             "abTestVersion": "[object Object]",
             "appType": "m",
-            "data_collection_enabled": "true",
             "secUid": self.sec_user_id,
             "uniqueId": self.unique_id,
             "user": "[object Object]",
-            "user_is_login": "true",
         }
 
 
-async def main():
+async def test():
+    from src.testers import Params
+
     async with Params() as params:
-        i = InfoTikTok(params, )
+        InfoTikTok.params["msToken"] = params.ms_token_tiktok
+        i = InfoTikTok(
+            params,
+            unique_id="",
+            sec_user_id="",
+        )
         print(await i.run())
 
 
 if __name__ == "__main__":
-    run(main())
+    from asyncio import run
+
+    run(test())

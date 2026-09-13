@@ -7,26 +7,28 @@ from typing import TYPE_CHECKING
 from .text import BaseTextLogger
 
 if TYPE_CHECKING:
-    from src.tools import ColorfulConsole
+    from ..tools import ColorfulConsole
 
 __all__ = ["CSVLogger"]
 
 
 class CSVLogger(BaseTextLogger):
     """CSV 格式保存数据"""
+
     __type = "csv"
     encode = "UTF-8-SIG" if system() == "Windows" else "UTF-8"
 
     def __init__(
-            self,
-            root: Path,
-            title_line: tuple,
-            field_keys: tuple,
-            console: "ColorfulConsole",
-            old=None,
-            name="Solo_Download",
-            *args,
-            **kwargs):
+        self,
+        root: Path,
+        title_line: tuple,
+        field_keys: tuple,
+        console: "ColorfulConsole",
+        old=None,
+        name="Download",
+        *args,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.console = console
         self.file = None  # 文件对象
@@ -37,10 +39,7 @@ class CSVLogger(BaseTextLogger):
         self.field_keys = field_keys
 
     async def __aenter__(self):
-        self.file = self.path.open(
-            "a",
-            encoding=self.encode,
-            newline="")
+        self.file = self.path.open("a", encoding=self.encode, newline="")
         self.writer = writer(self.file)
         await self.title()
         return self
@@ -53,5 +52,5 @@ class CSVLogger(BaseTextLogger):
             # 如果文件没有任何数据，则写入标题行
             await self.save(self.title_line)
 
-    async def save(self, data, *args, **kwargs):
+    async def _save(self, data, *args, **kwargs):
         self.writer.writerow(data)

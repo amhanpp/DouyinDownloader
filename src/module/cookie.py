@@ -1,49 +1,95 @@
+from re import compile
 from typing import TYPE_CHECKING
 
-from src.tools import cookie_str_to_dict
+from pyperclip import paste
+
+from ..tools import cookie_str_to_dict
+from ..translation import _
 
 if TYPE_CHECKING:
-    from src.config import Settings
-    from src.tools import ColorfulConsole
+    from ..config import Settings
+    from ..tools import ColorfulConsole
 
 __all__ = ["Cookie"]
 
 
 class Cookie:
+    PATTERN = compile(r"[!#$%&'*+\-.^_`|~0-9A-Za-z]+=([^;\s][^;]*)")
     STATE_KEY = "sessionid_ss"
-    PLATFORM = (
-        "抖音",
-        "TikTok",
-    )
+    PLATFORM_KEY = {
+        False: "cookie",
+        True: "cookie_tiktok",
+    }
 
     def __init__(self, settings: "Settings", console: "ColorfulConsole"):
         self.settings = settings
         self.console = console
+        self.PLATFORM_NAME = {
+            False: _("抖音"),
+            True: "TikTok",
+        }
 
-    def run(self, key="cookie", tiktok=0, ):
+    def run(
+        self,
+        cookie: str = "",
+        tiktok: bool = False,
+    ) -> bool:
         """提取 Cookie 并写入配置文件"""
-        if not (
-                cookie := self.console.input(
-                    f"请粘贴 {self.PLATFORM[tiktok]} Cookie 内容: ")):
+        if not cookie:
+            cookie: str = paste()
+
+        if not self.validate_cookie_minimal(cookie):
+            self.console.warning(_("当前内容不是有效的 Cookie 内容！"))
             return False
-        self.extract(cookie, key=key)
+
+        self.extract(
+            cookie,
+            key=self.PLATFORM_KEY[tiktok],
+            platform=self.PLATFORM_NAME[tiktok],
+        )
         return True
 
-    def extract(self, cookie: str, write=True, key="cookie", ) -> dict:
+    def extract(
+        self,
+        cookie: str,
+        write=True,
+        key="cookie",
+        platform: str = ...,
+    ) -> dict:
         cookie_dict = cookie_str_to_dict(cookie)
-        self.__check_state(cookie_dict)
+        self.__check_state(
+            cookie_dict,
+            platform,
+        )
         if write:
             self.save_cookie(cookie_dict, key)
-            self.console.print("写入 Cookie 成功！")
+            self.console.print(
+                _(f"写入 {platform} Cookie 成功！").format(platform=platform)
+            )
         return cookie_dict
 
-    def __check_state(self, items: dict) -> None:
+    def __check_state(self, items: dict, platform: str) -> None:
         if items.get(self.STATE_KEY):
-            self.console.print("当前 Cookie 已登录")
+            self.console.print(
+                _(f"当前 {platform} Cookie 已登录").format(platform=platform)
+            )
         else:
-            self.console.print("当前 Cookie 未登录")
+            self.console.print(
+                _(f"当前 {platform} Cookie 未登录").format(platform=platform)
+            )
 
     def save_cookie(self, cookie: dict, key="cookie") -> None:
         data = self.settings.read()
         data[key] = cookie
         self.settings.update(data)
+
+    @classmethod
+    def validate_cookie_minimal(cls, cookie_str: str) -> bool:
+        """
+        只检查整个字符串中是否存在 key=value 子串，
+        且 key 和 value 都非空。
+        返回 True 或 False。
+        """
+        if not isinstance(cookie_str, str):
+            return False
+        return bool(cls.PATTERN.search(cookie_str))

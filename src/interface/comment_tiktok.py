@@ -1,30 +1,35 @@
-from asyncio import run
-from typing import TYPE_CHECKING
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 from src.interface.comment import Comment, Reply
 from src.interface.template import APITikTok
-from src.testers import Params
+from src.translation import _
 
 if TYPE_CHECKING:
     from src.config import Parameter
+    from src.testers import Params
 
 
 class CommentTikTok(Comment, APITikTok):
-    def __init__(self,
-                 params: Union["Parameter", Params],
-                 cookie: str | dict = None,
-                 proxy: str = None,
-                 item_id: str = ...,
-                 pages: int = None,
-                 cursor=0,
-                 count=20,
-                 count_reply=3,
-                 ):
-        super().__init__(params, cookie, proxy, item_id, pages, cursor, count, count_reply)
+    def __init__(
+        self,
+        params: Union["Parameter", "Params"],
+        cookie: str = "",
+        proxy: str | None = None,
+        detail_id: str = ...,
+        pages: int = None,
+        cursor=0,
+        count=20,
+        count_reply=3,
+    ):
+        super().__init__(
+            params, cookie, proxy, detail_id, pages, cursor, count, count_reply
+        )
         self.api = f"{self.domain}api/comment/list/"
+        self.text = _("作品评论")
 
-    def generate_params(self, ) -> dict:
+    def generate_params(
+        self,
+    ) -> dict:
         return self.params | {
             "aweme_id": self.item_id,
             "count": self.count,
@@ -37,32 +42,36 @@ class CommentTikTok(Comment, APITikTok):
 
 
 class ReplyTikTok(Reply, CommentTikTok, APITikTok):
-    def __init__(self,
-                 params: Union["Parameter", Params],
-                 cookie: str | dict = None,
-                 proxy: str = None,
-                 item_id: str = "",
-                 comment_id: str = "",
-                 pages: int = None,
-                 cursor=0,
-                 count=3,
-                 progress=None,
-                 task_id=None,
-                 ):
+    def __init__(
+        self,
+        params: Union["Parameter", "Params"],
+        cookie: str = "",
+        proxy: str | None = None,
+        detail_id: str = "",
+        comment_id: str = "",
+        pages: int = None,
+        cursor=0,
+        count=3,
+        progress=None,
+        task_id=None,
+    ):
         super().__init__(
             params,
             cookie,
             proxy,
-            item_id,
+            detail_id,
             comment_id,
             pages,
             cursor,
             count,
             progress,
-            task_id)
+            task_id,
+        )
         self.api = f"{self.domain}api/comment/list/reply/"
 
-    def generate_params(self, ) -> dict:
+    def generate_params(
+        self,
+    ) -> dict:
         return self.params | {
             "comment_id": self.comment_id,
             "count": self.count,
@@ -73,11 +82,26 @@ class ReplyTikTok(Reply, CommentTikTok, APITikTok):
         }
 
 
-async def main():
+async def test():
+    from src.testers import Params
+
     async with Params() as params:
-        c = CommentTikTok(params, item_id="7360156187515456775", )
-        print(await c.run())
+        CommentTikTok.params["msToken"] = params.ms_token_tiktok
+        ReplyTikTok.params["msToken"] = params.ms_token_tiktok
+        i = CommentTikTok(
+            params,
+            detail_id="",
+        )
+        print(await i.run())
+        i = ReplyTikTok(
+            params,
+            detail_id="",
+            comment_id="",
+        )
+        print(await i.run())
 
 
 if __name__ == "__main__":
-    run(main())
+    from asyncio import run
+
+    run(test())

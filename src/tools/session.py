@@ -1,69 +1,68 @@
-from typing import TYPE_CHECKING
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
-from httpx import AsyncClient
-from httpx import Client
-from httpx import Limits
+from curl_cffi.requests import AsyncSession, Session
 
-from src.custom import MAX_WORKERS
-from src.custom import TIMEOUT
-from src.custom import USERAGENT
-from src.tools import TikTokDownloaderError
+from ..custom import IMPERSONATE, TIMEOUT, USERAGENT
+from ..tools import DownloaderError
 from .capture import capture_error_params
-from .retry import PrivateRetry
+from .retry import Retry
 
 if TYPE_CHECKING:
-    from src.record import BaseLogger
-    from src.record import LoggerManager
-    from src.testers import Logger
+    from ..record import BaseLogger, LoggerManager
+    from ..testers import Logger
 
 __all__ = ["request_params", "create_client"]
 
 
 def create_client(
-        user_agent=USERAGENT,
-        timeout=TIMEOUT,
-        headers: dict = None,
-        max_connections=MAX_WORKERS,
-        *args,
-        **kwargs,
-) -> AsyncClient:
-    return AsyncClient(
-        headers=headers or {"User-Agent": user_agent, },
+    timeout=TIMEOUT,
+    headers: dict | None = None,
+    proxy: str | None = None,
+    impersonate=IMPERSONATE,
+    *args,
+    **kwargs,
+) -> AsyncSession:
+    return AsyncSession(
+        headers=headers,
         timeout=timeout,
-        follow_redirects=True,
+        allow_redirects=True,
         verify=False,
-        limits=Limits(max_connections=max_connections),
+        proxy=proxy,
+        impersonate=impersonate,
         *args,
         **kwargs,
     )
 
 
 async def request_params(
-        logger: Union["BaseLogger", "LoggerManager", "Logger",],
-        url: str,
-        method: str = "POST",
-        params: dict | str = None,
-        data: dict | str = None,
-        useragent=USERAGENT,
-        timeout=TIMEOUT,
-        headers: dict = None,
-        resp="headers",
-        proxy: str = None,
-        proxies: dict = None,
-        **kwargs,
+    logger: Union[
+        "BaseLogger",
+        "LoggerManager",
+        "Logger",
+    ],
+    url: str,
+    method: str = "POST",
+    params: dict | str = "",
+    data: dict | str = "",
+    useragent=USERAGENT,
+    timeout=TIMEOUT,
+    headers: dict | None = None,
+    resp="headers",
+    proxy: str | None = None,
+    impersonate=IMPERSONATE,
+    **kwargs,
 ):
-    with Client(
-            headers=headers or {
-                "User-Agent": useragent,
-                "Content-Type": "application/json; charset=utf-8",
-                # "Referer": "https://www.douyin.com/"
-            },
-            follow_redirects=True,
-            timeout=timeout,
-            verify=False,
-            proxy=proxy,
-            proxies=proxies,
+    with Session(
+        headers=headers
+        or {
+            "Content-Type": "application/json; charset=utf-8",
+            # "Referer": "https://www.douyin.com/"
+        },
+        allow_redirects=True,
+        timeout=timeout,
+        verify=False,
+        proxy=proxy,
+        impersonate=impersonate,
     ) as client:
         return await request(
             logger,
@@ -77,15 +76,20 @@ async def request_params(
         )
 
 
-@PrivateRetry.retry_lite
+@Retry.retry_lite
 @capture_error_params
-async def request(logger: Union["BaseLogger", "LoggerManager", "Logger",],
-                  client: Client,
-                  method: str,
-                  url: str,
-                  resp="json",
-                  **kwargs,
-                  ):
+async def request(
+    logger: Union[
+        "BaseLogger",
+        "LoggerManager",
+        "Logger",
+    ],
+    client: Session,
+    method: str,
+    url: str,
+    resp="json",
+    **kwargs,
+):
     response = client.request(method, url, **kwargs)
     response.raise_for_status()
     match resp:
@@ -102,4 +106,4 @@ async def request(logger: Union["BaseLogger", "LoggerManager", "Logger",],
         case "response":
             return response
         case _:
-            raise TikTokDownloaderError
+            raise DownloaderError
